@@ -166,3 +166,76 @@ def get_event_basic_by_qid(qid):
         "description": row.get("description", {}).get("value"),
         "image": row.get("image", {}).get("value")
     }
+
+
+def get_event_optional_enrichment(qid):
+    q = '''
+    SELECT 
+        ?description ?image ?startDate ?endDate ?coordinates 
+        ?primaryCategory ?location ?deaths ?cause ?effect ?instanceOf ?video
+    WHERE 
+    {
+        BIND(wd:%s AS ?event)
+        OPTIONAL { ?event schema:description ?description FILTER(LANG(?description)='en') }
+        OPTIONAL { ?event wdt:P18 ?image. }
+        OPTIONAL { ?event wdt:P580 ?startDate. } 
+        OPTIONAL { ?event wdt:P582 ?endDate. } 
+        OPTIONAL { ?event wdt:P625 ?coordinates. } 
+        OPTIONAL { ?event wdt:P31 ?primaryCategory. }
+        OPTIONAL { ?event wdt:P276 ?location. }
+        OPTIONAL { ?event wdt:P1120 ?deaths. }
+        OPTIONAL { ?event wdt:P828 ?cause. }
+        OPTIONAL { ?event wdt:P1542 ?effect. }
+        OPTIONAL { ?event wdt:P31 ?instanceOf. }
+        OPTIONAL { ?event wdt:P1047 ?video. }
+    }
+    ''' % qid
+    
+    data = run_sparql(WIKIDATA_ENDPOINT, q)
+    rows = data.get('results', {}).get('bindings', [])
+    if not rows:
+        return None
+    
+    result = {
+        "qid": qid,
+        "description": None,
+        "image": None,
+        "start_date": None,
+        "end_date": None,
+        "coordinates": None,
+        "primary_category": set(),
+        "location": set(),
+        "cause": set(),
+        "effect": set(),
+        "instance_of": set(),
+        "video": set(),
+        "deaths": None,
+    }
+
+    for row in rows:
+        if result["description"] is None: result["description"] = row.get("description", {}).get("value")
+        if result["image"] is None: result["image"] = row.get("image", {}).get("value")
+        if result["start_date"] is None: result["start_date"] = row.get("startDate", {}).get("value")
+        if result["end_date"] is None: result["end_date"] = row.get("endDate", {}).get("value")
+        if result["coordinates"] is None: result["coordinates"] = row.get("coordinates", {}).get("value")
+        if result["deaths"] is None: result["deaths"] = row.get("deaths", {}).get("value")
+        if row.get("primaryCategory"): result["primary_category"].add(row["primaryCategory"]["value"])
+        if row.get("location"): result["location"].add(row["location"]["value"])
+        if row.get("cause"): result["cause"].add(row["cause"]["value"])
+        if row.get("effect"): result["effect"].add(row["effect"]["value"])
+        if row.get("instanceOf"): result["instance_of"].add(row["instanceOf"]["value"])
+        if row.get("video"): result["video"].add(row["video"]["value"])
+
+    for key in ["primary_category", "location", "cause", "effect", "instance_of", "video"]:
+        if result[key]:
+            result[key] = list(result[key])
+        else:
+            result[key] = None 
+
+    if result["primary_category"] or result["instance_of"]:
+        all_categories = set((result["primary_category"] or []) + (result["instance_of"] or []))
+        result["primary_category"] = list(all_categories)
+        
+    del result["instance_of"]
+    
+    return result

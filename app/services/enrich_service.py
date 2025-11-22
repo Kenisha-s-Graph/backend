@@ -7,6 +7,7 @@ from app.services.sparql_service import (
     get_person_events,
     get_event_qid_by_name,
     get_event_basic_by_qid,
+    get_event_optional_enrichment,
 )
 from app.db.neo4j_repo import get_repo
 
@@ -133,4 +134,56 @@ def enrich_all_events():
             image=basic.get("image") if basic else None,
         )
         results.append({"event_id": event_id, "name": name, "qid": qid, "status": "ok"})
+    return results
+
+def enrich_events_with_optional_properties():
+    events = repo.get_all_events(limit=10000)
+    results = []
+    
+    for e in events:
+        name = e.get("name")
+        event_id = e.get("event_id")
+        
+        if not name or not event_id:
+            results.append({"event_id": event_id, "status": "skip_no_name_or_id"})
+            continue
+
+        qids = get_event_qid_by_name(name)
+        qid = qids[0] if qids else None
+        
+        if not qid:
+            results.append(
+                {"event_id": event_id, "name": name, "status": "qid_not_found"}
+            )
+            continue
+
+        enriched_data = get_event_optional_enrichment(qid)
+        
+        if not enriched_data:
+            results.append(
+                {"event_id": event_id, "name": name, "qid": qid, "status": "enrichment_data_empty"}
+            )
+            continue
+        
+        try:
+            repo.upsert_event_enrichment_optional(
+                event_id=event_id,
+                qid=qid,
+                description=enriched_data.get("description"),
+                image=enriched_data.get("image"),
+                start_date=enriched_data.get("start_date"),
+                end_date=enriched_data.get("end_date"),
+                coordinates=enriched_data.get("coordinates"),
+                deaths=enriched_data.get("deaths"),
+                video=enriched_data.get("video"),
+                primary_category=enriched_data.get("primary_category"), 
+                location=enriched_data.get("location"),
+                cause=enriched_data.get("cause"),
+                effect=enriched_data.get("effect"),
+            )
+            results.append({"event_id": event_id, "name": name, "qid": qid, "status": "ok"})
+        except Exception as e:
+            results.append({"event_id": event_id, "name": name, "qid": qid, "status": "upsert_failed", "error": str(e)})
+            continue 
+            
     return results

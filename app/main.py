@@ -1,7 +1,7 @@
 # main.py
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from app.services.enrich_service import enrich_all_events, enrich_person_by_name, enrich_event_by_name
+from app.services.enrich_service import enrich_all_events, enrich_person_by_name, enrich_event_by_name, enrich_events_with_optional_properties
 from app.db.neo4j_repo import get_repo
 import time
 
@@ -58,4 +58,9 @@ def enrich_batch(offset: int = 0, limit: int = 100):
 @app.post("/enrich/event")
 def enrich_event():
     results = enrich_all_events()
+    return {"done": len(results), "results": results}
+
+@app.post("/enrich/event/optional")
+def enrich_event_optional():
+    results = enrich_events_with_optional_properties()
     return {"done": len(results), "results": results}

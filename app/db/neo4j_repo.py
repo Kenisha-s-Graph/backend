@@ -165,5 +165,61 @@ class Neo4jRepo:
                 "image": image
             })
 
+    def upsert_event_enrichment_optional(
+        self,
+        event_id,
+        qid,
+        description=None,
+        image=None,
+        start_date=None, 
+        end_date=None, 
+        coordinates=None,
+        deaths=None,          
+        video=None,    
+        location=None,  
+        cause=None,    
+        effect=None,    
+        primary_category=None,  
+    ):
+        with self.driver.session(database=self.db) as session:
+            session.run("""
+                MATCH (e:Event {event_id: $event_id})
+                SET 
+                    // Dasar & Temporal
+                    e.wikidata_qid = $qid,
+                    e.description = $description,
+                    e.image_url = $image,
+                    e.coordinates = $coordinates,
+                    e.start_date = $start_date,
+                    e.end_date = $end_date,
+                    
+                    // Numerik
+                    e.number_of_deaths = toInteger($deaths),
+                    
+                    // Multi-Nilai (Disimpan sebagai List)
+                    e.primary_category_qids = $primary_category,
+                    e.location_qids = $location,
+                    e.cause_qids = $cause,
+                    e.effect_qids = $effect,
+                    e.video_urls = $video,
+
+                    // Metadata
+                    e.last_enriched = datetime()
+                """, {
+                    "event_id": event_id,
+                    "qid": qid,
+                    "description": description,
+                    "image": image,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "coordinates": coordinates,
+                    "deaths": deaths,
+                    "video": video,
+                    "location": location,
+                    "cause": cause,
+                    "effect": effect,
+                    "primary_category": primary_category,
+                })
+
 def get_repo():
     return Neo4jRepo(driver)
