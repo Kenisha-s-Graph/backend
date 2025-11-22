@@ -83,13 +83,24 @@ def get_person_dynasty(qid):
     q = '''
     SELECT ?dynastyLabel WHERE {
       BIND(wd:%s AS ?person)
-      OPTIONAL { ?person wdt:P53 ?dynasty. }
+      {
+        ?person wdt:P53 ?dynasty.
+      } UNION {
+        ?person wdt:P103 ?dynasty.
+      }
       SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
     }
     ''' % qid
     data = run_sparql(WIKIDATA_ENDPOINT, q)
     rows = data.get('results', {}).get('bindings', [])
-    dyns = [r['dynastyLabel']['value'] for r in rows if 'dynastyLabel' in r]
+    dyns = []
+    for r in rows:
+        if 'dynastyLabel' in r:
+            label = r['dynastyLabel']['value']
+            # Filter out QID responses
+            if not label.startswith('Q'):
+                dyns.append(label)
+    print("Dynasties found:", dyns)
     return dyns
 
 def get_person_cause_and_killer(qid):

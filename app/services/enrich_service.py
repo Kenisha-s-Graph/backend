@@ -9,9 +9,7 @@ def enrich_person_by_name(name):
     match = None
 
     for p in persons:
-        # cek name OR full_name
-        internal_name = p.get('name') or p.get('full_name')
-
+        internal_name = p.get('full_name')
         if internal_name and internal_name.lower() == name.lower():
             match = p
             break
@@ -19,7 +17,13 @@ def enrich_person_by_name(name):
     if not match:
         return {"status":"not_found", "name": name}
 
-    person_id = match.get('id') or match.get('name')
+    person_id = match.get('article_id')  # ubah dari 'id' ke 'article_id'
+    
+    # Tambahkan validasi
+    if person_id is None:
+        return {"status":"error", "name": name, "message": "article_id is None"}
+    
+    print(f"Found internal person: {internal_name} with article_id {person_id}")
 
     # Step B: find QID in Wikidata
     qids = find_qid_by_label(name, limit=5)

@@ -35,7 +35,7 @@ class Neo4jRepo:
         with self.driver.session(database=self.db) as session:
             res = session.run("""
                 MATCH (p:Person)
-                RETURN p.name AS name, p.id AS id, p.full_name AS full_name
+                RETURN p.name AS name, p.article_id AS article_id, p.full_name AS full_name
                 LIMIT $limit
             """, {"limit": limit})
             return [dict(r) for r in res]
@@ -71,7 +71,7 @@ class Neo4jRepo:
 
             # Update basic attributes
             session.run("""
-                MATCH (p:Person {id: $person_id})
+                MATCH (p:Person {article_id: $person_id})
                 SET p.wikidata_qid = $qid,
                     p.abstract = $description,
                     p.image_url = $image,
@@ -87,7 +87,7 @@ class Neo4jRepo:
             # Killer relation
             if killer:
                 session.run("""
-                    MATCH (victim:Person {id: $person_id})
+                    MATCH (victim:Person {article_id: $person_id})
                     MERGE (killer:Person {name: $killer})
                     MERGE (victim)-[:KILLED_BY]->(killer)
                 """, {"person_id": person_id, "killer": killer})
@@ -96,7 +96,7 @@ class Neo4jRepo:
             if reigns:
                 for r in reigns:
                     session.run("""
-                        MATCH (p:Person {id: $person_id})
+                        MATCH (p:Person {article_id: $person_id})
                         MERGE (pos:Position {name: $positionName})
                         MERGE (p)-[rel:HELD_POSITION]->(pos)
                         SET rel.start = $start,
@@ -111,21 +111,22 @@ class Neo4jRepo:
             # Dynasties
             if dynasties:
                 for d in dynasties:
-                    session.run("""
-                        MATCH (p:Person {id: $person_id})
-                        MERGE (d:Dynasty {name: $dynasty})
-                        MERGE (p)-[:MEMBER_OF_DYNASTY]->(d)
-                    """, {"person_id": person_id, "dynasty": d})
+                    if d and d.strip():  # pastikan tidak kosong
+                        session.run("""
+                            MATCH (p:Person {article_id: $person_id})
+                            MERGE (dyn:Dynasty {name: $dynasty})
+                            MERGE (p)-[:MEMBER_OF_DYNASTY]->(dyn)
+                        """, {"person_id": person_id, "dynasty": d.strip()})
+                        print(f"Created MEMBER_OF_DYNASTY relationship to: {d}")
 
             # Event participation
             if events:
                 for e in events:
                     session.run("""
-                        MATCH (p:Person {id: $person_id})
+                        MATCH (p:Person {article_id: $person_id})
                         MERGE (ev:Event {name: $event})
                         MERGE (p)-[:PARTICIPATED_IN]->(ev)
                     """, {"person_id": person_id, "event": e})
-
 
 def get_repo():
     return Neo4jRepo(driver)

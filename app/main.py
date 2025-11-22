@@ -3,6 +3,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from app.services.enrich_service import enrich_person_by_name
 from app.db.neo4j_repo import get_repo
+import time
 
 app = FastAPI(title="KG Enrichment Service - Person")
 
@@ -22,13 +23,21 @@ def enrich_person(payload: EnrichName):
         raise HTTPException(status_code=404, detail=f"Wikidata QID not found for {payload.name}")
     return res
 
-@app.post("/enrich/persons")
-def enrich_all():
+@app.post("/enrich/persons/batch")
+def enrich_batch(offset: int = 0, limit: int = 100):
     repo = get_repo()
-    persons = repo.get_all_persons(limit=10000)
+    # Query hanya person yang belum punya MEMBER_OF_DYNASTY
+    with repo.driver.session(database=repo.db) as session:
+        res = session.run("""
+            MATCH (p:Person)
+            WHERE NOT (p)-[:MEMBER_OF_DYNASTY]->(:Dynasty)
+            RETURN p.name AS name, p.article_id AS article_id, p.full_name AS full_name
+            SKIP $offset LIMIT $limit
+        """, {"offset": offset, "limit": limit})
+        persons = [dict(r) for r in res]
     results = []
     for p in persons:
-        name = p.get('name')
+        name = p.get('full_name')
         if not name:
             continue
         try:
@@ -36,4 +45,5 @@ def enrich_all():
             results.append({name: r})
         except Exception as e:
             results.append({name: {"status":"error", "error": str(e)}})
+        time.sleep(0.5)
     return {"done": len(results), "results": results}
