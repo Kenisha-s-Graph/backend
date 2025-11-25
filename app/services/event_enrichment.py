@@ -2,9 +2,9 @@ from app.services.sparql_service import (
     get_event_qid_by_name,
     get_event_basic_by_qid,
 )
-from app.db.neo4j_repo import get_repo
+from app.db.event_repo import get_event_repo
 
-repo = get_repo()
+repo = get_event_repo()
 
 # event enrichment
 def enrich_event_by_name(name):

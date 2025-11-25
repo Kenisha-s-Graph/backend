@@ -5,9 +5,9 @@ from app.services.sparql_service import (
     get_person_notable_works, get_person_alliances, get_person_military_rank,
     get_person_religious_orders, get_person_convicted_of
 )
-from app.db.neo4j_repo import get_repo
+from app.db.person_repo import get_person_repo
 
-repo = get_repo()
+repo = get_person_repo()
 
 def preview_person_enrichment(name):
     """
