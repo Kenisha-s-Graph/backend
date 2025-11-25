@@ -6,10 +6,6 @@ from app.db.neo4j_repo import get_repo
 
 router = APIRouter()
 
-@router.get("/health")
-def health():
-    return {"status":"ok"}
-
 @router.post("")
 def enrich_event():
     results = enrich_all_events()
