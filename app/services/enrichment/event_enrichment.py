@@ -1,4 +1,4 @@
-from app.services.sparql_service import (
+from app.services.enrichment.sparql_service import (
     get_event_qid_by_name,
     get_event_basic_by_qid,
 )

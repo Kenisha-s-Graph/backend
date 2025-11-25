@@ -1,4 +1,4 @@
-from app.services.sparql_service import (
+from app.services.enrichment.sparql_service import (
     find_qid_by_label, get_person_basic_by_qid, get_person_positions, 
     get_person_dynasty, get_person_cause_and_killer, get_person_events,
     get_person_death_info, get_person_conflicts, get_person_awards,
