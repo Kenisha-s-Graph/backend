@@ -1,13 +1,13 @@
-from app.services.sparql_service import (
+from app.services.enrichment.sparql_service import (
     find_qid_by_label, get_person_basic_by_qid, get_person_positions, 
     get_person_dynasty, get_person_cause_and_killer, get_person_events,
     get_person_death_info, get_person_conflicts, get_person_awards,
     get_person_notable_works, get_person_alliances, get_person_military_rank,
     get_person_religious_orders, get_person_convicted_of
 )
-from app.db.neo4j_repo import get_repo
+from app.db.person_repo import get_person_repo
 
-repo = get_repo()
+repo = get_person_repo()
 
 def preview_person_enrichment(name):
     """

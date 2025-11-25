@@ -1,7 +1,7 @@
 import time
 from fastapi import APIRouter, HTTPException
-from app.models.person_enrichment import EnrichName, EnrichConfirm, EnrichNamesList
-from app.services.enrich_service import enrich_person_by_name, preview_person_enrichment
+from app.models.request.person_enrichment import EnrichName, EnrichConfirm, EnrichNamesList
+from app.services.enrichment.person_enrichment_service import enrich_person_by_name, preview_person_enrichment
 from app.db.neo4j_repo import get_repo
 
 router = APIRouter()
