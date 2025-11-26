@@ -11,4 +11,3 @@ app.include_router(health_router)
 app.include_router(person_enrichment_router, prefix="/enrich/persons")
 app.include_router(event_enrichment_router, prefix="/enrich/events")
 app.include_router(explore_router)
-
