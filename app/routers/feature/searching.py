@@ -242,14 +242,14 @@ def get_search_suggestions(q: str = Query(..., min_length=2)):
             suggestions_cypher = """
             MATCH (p:Person)
             WHERE p.full_name IS NOT NULL AND toLower(p.full_name) STARTS WITH $query
-            RETURN p.full_name AS suggestion, "person" AS type
+            RETURN id(p) AS id, p.full_name AS suggestion, "person" AS type
             LIMIT 5
             
             UNION
             
             MATCH (e:Event)
             WHERE e.name IS NOT NULL AND toLower(e.name) STARTS WITH $query
-            RETURN e.name AS suggestion, "event" AS type
+            RETURN id(e) AS id, e.name AS suggestion, "event" AS type
             LIMIT 5
             """
             
@@ -258,6 +258,7 @@ def get_search_suggestions(q: str = Query(..., min_length=2)):
             suggestions = []
             for record in results:
                 suggestions.append({
+                    "id": record["id"],
                     "text": record["suggestion"],
                     "type": record["type"] 
                 })
