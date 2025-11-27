@@ -63,15 +63,14 @@ def search_historical_data(payload: SearchRequest):
             
             filter_conditions, base_params = _build_filter_conditions()
 
-            # PERSON SEARCH - Fixed with proper OPTIONAL MATCH handling
+            # PERSON SEARCH - With aggregated positions
             if payload.search_type in ["person", "all"]:
 
-                # Approach: Use WHERE after WITH to avoid OPTIONAL MATCH issues
                 person_cypher = f"""
                 MATCH (p:Person)
                 OPTIONAL MATCH (p)-[:HELD_POSITION]->(pos:Position)  
                 OPTIONAL MATCH (p)-[:BORN_IN]->(c:City)-[:LOCATED_IN]->(country:Country)-[:LOCATED_IN]->(continent:Continent)
-                WITH DISTINCT p, pos, country, continent
+                WITH p, pos, country, continent
                 WHERE (
                     (p.full_name IS NOT NULL AND toLower(p.full_name) CONTAINS $query) OR
                     (p.description IS NOT NULL AND toLower(p.description) CONTAINS $query) OR
@@ -84,13 +83,16 @@ def search_historical_data(payload: SearchRequest):
                 if filter_conditions:
                     person_cypher += " AND (" + " AND ".join(filter_conditions) + ")"
                 
+                # Aggregate positions per person
                 person_cypher += """
+                WITH p, country, 
+                     collect(DISTINCT coalesce(pos.label, pos.name)) as all_positions
                 RETURN 
                     id(p) AS id,
                     p.full_name AS name,
                     p.description AS description,
                     p.image_url AS image,
-                    coalesce(pos.label, pos.name) AS position,
+                    all_positions,
                     country.country AS country
                 ORDER BY p.full_name
                 SKIP $offset
@@ -106,6 +108,12 @@ def search_historical_data(payload: SearchRequest):
                 person_results = session.run(person_cypher, person_params)
                 
                 for record in person_results:
+                    # Clean up positions - remove null values and join
+                    positions = [pos for pos in record["all_positions"] if pos is not None]
+                    position_text = ", ".join(positions[:3]) if positions else None  # Limit to 3 positions
+                    if len(positions) > 3:
+                        position_text += f" + {len(positions) - 3} more"
+                    
                     results["persons"]["data"].append({
                         "type": "person",
                         "id": record["id"],
@@ -113,7 +121,8 @@ def search_historical_data(payload: SearchRequest):
                         "description": record["description"],
                         "image": record["image"],
                         "context": {
-                            "position": record["position"], 
+                            "positions": positions,  # Array of all positions
+                            "primary_position": position_text,  # Formatted text
                             "country": record["country"]
                         }
                     })
