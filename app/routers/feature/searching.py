@@ -41,30 +41,22 @@ def search_historical_data(payload: SearchRequest):
 
     def _build_filter_conditions():
         """Build filter conditions and return WHERE clauses with parameters"""
-        conditions = []
+        filter_conditions = []
         params = {"query": query_lower}
         
         # Country filter - support multiple countries
         if payload.filter_country and len(payload.filter_country) > 0:
-            # Convert to lowercase for case-insensitive matching
             country_list = [c.lower() for c in payload.filter_country]
-            conditions.append("toLower(country.country) IN $filter_countries")
+            filter_conditions.append("toLower(country.country) IN $filter_countries")
             params["filter_countries"] = country_list
-        else:
-            # If no country filter, include country search in main query
-            conditions.append("toLower(country.country) CONTAINS $query")
         
         # Continent filter - support multiple continents  
         if payload.filter_continent and len(payload.filter_continent) > 0:
-            # Convert to lowercase for case-insensitive matching
             continent_list = [c.lower() for c in payload.filter_continent]
-            conditions.append("toLower(continent.continent) IN $filter_continents")
+            filter_conditions.append("toLower(continent.continent) IN $filter_continents")
             params["filter_continents"] = continent_list
-        else:
-            # If no continent filter, include continent search in main query
-            conditions.append("toLower(continent.continent) CONTAINS $query")
             
-        return conditions, params
+        return filter_conditions, params
     
     try:
         with repo.driver.session(database=repo.db) as session:
@@ -74,7 +66,7 @@ def search_historical_data(payload: SearchRequest):
             # PERSON SEARCH - Multi-field search
             if payload.search_type in ["person", "all"]:
 
-                # Build main search conditions
+                # Build main search conditions (always these, no country/continent search here)
                 search_conditions = [
                     "toLower(p.full_name) CONTAINS $query",
                     "toLower(p.description) CONTAINS $query", 
@@ -82,12 +74,11 @@ def search_historical_data(payload: SearchRequest):
                     "toLower(pos.name) CONTAINS $query"
                 ]
                 
-                # Combine search conditions with filter conditions
-                all_conditions = search_conditions + filter_conditions
+                # Build WHERE statement
                 where_statement = "WHERE (" + " OR ".join(search_conditions) + ")"
                 
-                # Add filter conditions with AND logic
-                if payload.filter_country or payload.filter_continent:
+                # Add filter conditions with AND logic (separate from search conditions)
+                if filter_conditions:
                     filter_where = " AND (" + " AND ".join(filter_conditions) + ")"
                     where_statement += filter_where
 
@@ -96,7 +87,8 @@ def search_historical_data(payload: SearchRequest):
                 OPTIONAL MATCH (p)-[:HELD_POSITION]->(pos:Position)  
                 OPTIONAL MATCH (p)-[:BORN_IN]->(c:City)-[:LOCATED_IN]->(country:Country)-[:LOCATED_IN]->(continent:Continent)
                 { where_statement }
-                RETURN DISTINCT 
+                WITH DISTINCT p, pos, country, continent
+                RETURN 
                     id(p) AS id,
                     p.full_name AS name,
                     p.description AS description,
@@ -136,7 +128,7 @@ def search_historical_data(payload: SearchRequest):
             # EVENT SEARCH - Multi-field search  
             if (event_limit > 0) and (payload.search_type in ["event", "all"]):
                 
-                # Build main search conditions for events
+                # Build main search conditions for events (no country/continent search here)
                 search_conditions = [
                     "toLower(e.name) CONTAINS $query",
                     "toLower(e.description) CONTAINS $query",
@@ -146,8 +138,8 @@ def search_historical_data(payload: SearchRequest):
                 # Build WHERE statement
                 where_statement = "WHERE (" + " OR ".join(search_conditions) + ")"
                 
-                # Add filter conditions with AND logic
-                if payload.filter_country or payload.filter_continent:
+                # Add filter conditions with AND logic (separate from search conditions)
+                if filter_conditions:
                     filter_where = " AND (" + " AND ".join(filter_conditions) + ")"
                     where_statement += filter_where
 
@@ -155,6 +147,7 @@ def search_historical_data(payload: SearchRequest):
                 MATCH (e:Event)
                 OPTIONAL MATCH (e)-[:HELD_IN]->(country:Country)-[:LOCATED_IN]->(continent:Continent)
                 { where_statement }
+                WITH DISTINCT e, country, continent
                 RETURN 
                     id(e) AS id,
                     e.name AS name,
