@@ -53,21 +53,32 @@ def merge_date_attributes(properties: dict) -> dict:
     """
     new_properties = properties.copy()
     
-    day_str = str(new_properties.get("date", "")).strip()
-    month_str = str(new_properties.get("month", "")).strip()
-    year_str = str(new_properties.get("year", "")).strip()
+    day_raw = new_properties.get("date", "")
+    month_raw = new_properties.get("month", "")
+    year_raw = new_properties.get("year", "")
 
-    date_parts = [part for part in [day_str, month_str, year_str] if part]
+    def norm(s: object) -> str:
+        return str(s).strip()
 
-    if date_parts:
-        merged_date_str = " ".join(date_parts)
-        
+    # Normalize and filter out common placeholder values
+    SKIP = {"", "unknown", "n/a", "na", "none", "null", "unk", "-", "0", "00"}
+    parts = [norm(day_raw), norm(month_raw), norm(year_raw)]
+    meaningful_parts = [p for p in parts if p and p.lower() not in SKIP]
+
+    if meaningful_parts:
+        merged_date_str = " ".join(meaningful_parts)
         new_properties["date"] = merged_date_str
-
-        if "month" in new_properties:
-            del new_properties["month"]
-        if "year" in new_properties:
-            del new_properties["year"]
+        # remove separate month/year if present
+        new_properties.pop("month", None)
+        new_properties.pop("year", None)
+    else:
+        # No meaningful date components: remove empty/placeholder keys if present
+        if "date" in new_properties and (str(new_properties["date"]).strip().lower() in SKIP):
+            new_properties.pop("date", None)
+        if "month" in new_properties and (str(new_properties["month"]).strip().lower() in SKIP):
+            new_properties.pop("month", None)
+        if "year" in new_properties and (str(new_properties["year"]).strip().lower() in SKIP):
+            new_properties.pop("year", None)
             
     return new_properties
 
