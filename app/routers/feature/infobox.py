@@ -10,7 +10,8 @@ FORBIDDEN = [
     "CREATE", "MERGE", "DELETE", "SET", "REMOVE", "DROP", "CALL", "LOAD CSV", "UNWIND"
 ]
 
-EXCLUDED_PROPERTIES = {"embedding", "embedding_updated", "searchable_text", "point_in_time", "article_id", "event_id", "primary_category_qid"}
+EXCLUDED_PROPERTIES = {"embedding", "embedding_updated", "searchable_text", "point_in_time", "article_id", "event_id", 
+                       "primary_category_qid", "primary_category_qids", "described_by_source_qids", "location_qids", "participant_qids", "part_of_qids", "effect_qids", "has_part_qids", "cause_qids"}
 
 
 def filter_properties(obj):
