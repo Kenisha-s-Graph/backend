@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from app.db.neo4j_repo import get_repo
 from app.models.request.cypherRequest import CypherQueryRequest
-from neo4j.graph import Node, Relationship
+from neo4j.graph import Node, Relationship, Path
 import re
 
 router = APIRouter()
@@ -29,6 +29,15 @@ def format_value_for_table(value):
             props_str = ", ".join([f"{k}: {repr(v)}" for k, v in props.items()])
             return f"[:{value.type} {{{props_str}}}]"
         return f"[:{value.type}]"
+    elif isinstance(value, Path):
+        # Format path: (start)-[rel]->(end)-[rel2]->(end2)
+        path_str = ""
+        for i, node in enumerate(value.nodes):
+            if i > 0:
+                rel = value.relationships[i-1]
+                path_str += f"-[:{rel.type}]->"
+            path_str += format_value_for_table(node)
+        return path_str
     elif isinstance(value, list):
         return [format_value_for_table(item) for item in value]
     elif isinstance(value, dict):
@@ -42,58 +51,51 @@ def extract_graph_data(records):
     node_label_counts = {}
     relationship_type_counts = {}
     
+    def process_node(node):
+        """Helper to process and add a node"""
+        node_id = node.element_id
+        if node_id not in nodes:
+            labels = list(node.labels)
+            nodes[node_id] = {
+                "id": node_id,
+                "labels": labels,
+                "properties": dict(node)
+            }
+            for label in labels:
+                node_label_counts[label] = node_label_counts.get(label, 0) + 1
+    
+    def process_relationship(rel):
+        """Helper to process and add a relationship"""
+        rel_id = rel.element_id
+        # Check if already added
+        if not any(r["id"] == rel_id for r in relationships):
+            relationships.append({
+                "id": rel_id,
+                "type": rel.type,
+                "startNode": rel.start_node.element_id,
+                "endNode": rel.end_node.element_id,
+                "properties": dict(rel)
+            })
+            relationship_type_counts[rel.type] = relationship_type_counts.get(rel.type, 0) + 1
+        
+        # Process connected nodes
+        process_node(rel.start_node)
+        process_node(rel.end_node)
+    
     for record in records:
         for key, value in record.items():
             if isinstance(value, Node):
-                node_id = value.element_id
-                if node_id not in nodes:
-                    labels = list(value.labels)
-                    nodes[node_id] = {
-                        "id": node_id,
-                        "labels": labels,
-                        "properties": dict(value)
-                    }
-                    # Count node labels
-                    for label in labels:
-                        node_label_counts[label] = node_label_counts.get(label, 0) + 1
+                process_node(value)
                         
             elif isinstance(value, Relationship):
-                rel_id = value.element_id
-                start_id = value.start_node.element_id
-                end_id = value.end_node.element_id
-                rel_type = value.type
-                
-                relationships.append({
-                    "id": rel_id,
-                    "type": rel_type,
-                    "startNode": start_id,
-                    "endNode": end_id,
-                    "properties": dict(value)
-                })
-                
-                # Count relationship types
-                relationship_type_counts[rel_type] = relationship_type_counts.get(rel_type, 0) + 1
-                
-                # Add related nodes if not already added
-                if start_id not in nodes:
-                    start_labels = list(value.start_node.labels)
-                    nodes[start_id] = {
-                        "id": start_id,
-                        "labels": start_labels,
-                        "properties": dict(value.start_node)
-                    }
-                    for label in start_labels:
-                        node_label_counts[label] = node_label_counts.get(label, 0) + 1
-                        
-                if end_id not in nodes:
-                    end_labels = list(value.end_node.labels)
-                    nodes[end_id] = {
-                        "id": end_id,
-                        "labels": end_labels,
-                        "properties": dict(value.end_node)
-                    }
-                    for label in end_labels:
-                        node_label_counts[label] = node_label_counts.get(label, 0) + 1
+                process_relationship(value)
+            
+            elif isinstance(value, Path):
+                # Extract all nodes and relationships from path
+                for node in value.nodes:
+                    process_node(node)
+                for rel in value.relationships:
+                    process_relationship(rel)
     
     return {
         "nodes": list(nodes.values()),
