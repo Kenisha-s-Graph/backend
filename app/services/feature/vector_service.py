@@ -4,16 +4,7 @@ from typing import List, Optional
 import os
 import torch
 
-# Singleton pattern untuk model
 _model = None
-
-# Model options (uncomment yang mau dipakai):
-# - "all-MiniLM-L6-v2"          : Fast, 384 dim, tapi kurang bagus untuk context
-# - "all-mpnet-base-v2"         : Better quality, 768 dim
-# - "BAAI/bge-base-en-v1.5"     : Good for semantic search, 768 dim
-# - "intfloat/e5-base-v2"       : Great for semantic search, 768 dim
-# - "Alibaba-NLP/gte-base-en-v1.5" : Qwen-based, good quality, 768 dim
-
 DEFAULT_MODEL = "BAAI/bge-base-en-v1.5"  # Recommended for semantic search
 
 

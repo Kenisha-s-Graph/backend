@@ -309,7 +309,6 @@ def semantic_search(payload: SemanticSearchRequest):
                     "context": {
                         "positions": p.get("positions", []),
                         "country": p.get("country"),
-                        "birth_date": p.get("birth_date"),
                         "death_date": p.get("death_date")
                     }
                 })
