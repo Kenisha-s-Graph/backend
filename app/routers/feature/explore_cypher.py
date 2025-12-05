@@ -14,38 +14,29 @@ def is_safe_cypher(query: str) -> bool:
     pattern = r"\b(" + "|".join(FORBIDDEN) + r")\b"
     return not re.search(pattern, query, re.IGNORECASE)
 
-def serialize_neo4j_value(value):
-    """
-    Convert Neo4j types to JSON-serializable format.
-    """
+def format_value_for_table(value):
     if isinstance(value, Node):
-        return {
-            "identity": value.element_id,
-            "labels": list(value.labels),
-            "properties": dict(value),
-            "elementType": "node"
-        }
+        labels = ":".join(value.labels)
+        props = dict(value)
+        # Format properties untuk display
+        if props:
+            props_str = ", ".join([f"{k}: {repr(v)}" for k, v in props.items()])
+            return f"(:{labels} {{{props_str}}})"
+        return f"(:{labels})"
     elif isinstance(value, Relationship):
-        return {
-            "identity": value.element_id,
-            "type": value.type,
-            "start": value.start_node.element_id,
-            "end": value.end_node.element_id,
-            "properties": dict(value),
-            "elementType": "relationship"
-        }
+        props = dict(value)
+        if props:
+            props_str = ", ".join([f"{k}: {repr(v)}" for k, v in props.items()])
+            return f"[:{value.type} {{{props_str}}}]"
+        return f"[:{value.type}]"
     elif isinstance(value, list):
-        return [serialize_neo4j_value(item) for item in value]
+        return [format_value_for_table(item) for item in value]
     elif isinstance(value, dict):
-        return {k: serialize_neo4j_value(v) for k, v in value.items()}
+        return {k: format_value_for_table(v) for k, v in value.items()}
     else:
         return value
 
 def extract_graph_data(records):
-    """
-    Extract nodes and relationships from Neo4j records for graph visualization.
-    Compatible with Neo4j Browser format with statistics.
-    """
     nodes = {}
     relationships = []
     node_label_counts = {}
@@ -117,11 +108,6 @@ def extract_graph_data(records):
 
 @router.post("/explore/cypher")
 def run_cypher_query(payload: CypherQueryRequest):
-    """
-    Jalankan Cypher query custom dari user ke Neo4j.
-    Hanya untuk eksplorasi data (tidak boleh mengubah DB).
-    Returns data in Neo4j Browser compatible format for Graph, Table, and Text views.
-    """
     if not is_safe_cypher(payload.query):
         raise HTTPException(
             status_code=403,
@@ -144,27 +130,13 @@ def run_cypher_query(payload: CypherQueryRequest):
         # Extract graph data (nodes and relationships)
         graph = extract_graph_data(records)
         
-        # Table view: structured data with serialized Neo4j objects
+        # Table view: format langsung untuk display (siap pakai di FE)
         table = []
         for record in records:
             row = {}
             for key in columns:
-                row[key] = serialize_neo4j_value(record[key])
+                row[key] = format_value_for_table(record[key])
             table.append(row)
-        
-        # Text/Raw view: simple key-value pairs
-        text = []
-        for i, record in enumerate(records):
-            row_data = {}
-            for key in columns:
-                value = record[key]
-                if isinstance(value, Node):
-                    row_data[key] = f"(:{''.join(value.labels)} {dict(value)})"
-                elif isinstance(value, Relationship):
-                    row_data[key] = f"[:{value.type} {dict(value)}]"
-                else:
-                    row_data[key] = value
-            text.append(row_data)
         
         return {
             "status": "ok",
@@ -174,8 +146,7 @@ def run_cypher_query(payload: CypherQueryRequest):
                 "columns": columns
             },
             "graph": graph,
-            "table": table,
-            "text": text
+            "table": table
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Cypher error: {e}")
