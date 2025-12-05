@@ -35,7 +35,13 @@ def format_value_for_table(value):
         for i, node in enumerate(value.nodes):
             if i > 0:
                 rel = value.relationships[i-1]
-                path_str += f"-[:{rel.type}]->"
+                # Format relationship dengan properties
+                rel_props = dict(rel)
+                if rel_props:
+                    rel_props_str = ", ".join([f"{k}: {repr(v)}" for k, v in rel_props.items()])
+                    path_str += f"-[:{rel.type} {{{rel_props_str}}}]->"
+                else:
+                    path_str += f"-[:{rel.type}]->"
             path_str += format_value_for_table(node)
         return path_str
     elif isinstance(value, list):
